@@ -8,12 +8,16 @@
  *    Command:  "R;"
  *    Response: (example) "R111110;\r\n"
  *   DIGITAL WRITE:
- *    Command:  (example: turn on output 0 thru 5)"W011121314151;"
+ *    Command:  (example: turn on output 0 thru 5) "W011121314151;"
  *    Response: "W;\r\n"
- *  VERSION:
+ *   ANALOG_READ:
+ *    Command:  (example: read pin A0) "A0;"
+ *    Response: "Api;\r\n" (where p is the pin and i is a decimal integer such that 0 >= i >= 1023)
+ *              Reading 1023 is 5.0V on the analog pin.
+ *   VERSION:
  *    Command: "V;"
  *    Response: (example) "V1;\r\n"
- *  BEGIN FIREHOSE:
+ *   BEGIN FIREHOSE:
  *    Command: "B;"
  *    Note:    Must be followed by S command to stop output.
  *             Output identical to the R command is continuously sent to the client.
@@ -58,8 +62,11 @@
 #define OUTPUT_FIRST (INPUT_FIRST + INPUT_COUNT)
 #define INPUT_LAST   (INPUT_FIRST  + INPUT_COUNT  - 1)
 #define OUTPUT_LAST  (OUTPUT_FIRST + OUTPUT_COUNT - 1)
-
-#define VERSION '1'
+#define ANALOG_COUNT 6
+#define STR_BUF_SZ   16
+#define DECIMAL      10
+// API Version
+#define VERSION '2'
 
 /*
  * Called by Arduino application framework to initialize the application.
@@ -108,6 +115,10 @@ char readCmd() {
         break;
       
       case 'W':
+        cmdRead = true;
+        break;
+      
+      case 'A':
         cmdRead = true;
         break;
       
@@ -230,6 +241,32 @@ void fireHose() {
 }
 
 /*
+ * Handler for for Analog Read command
+ */
+int readAnalog() {
+  int ret = -1;
+    // Read the output index
+  char  ch = readChar();
+  if (ch >= '0' && ch < '0' + ANALOG_COUNT) {
+    // Convert ASCII char to int
+    int pin = (int)ch - '0';
+    ret = analogRead(pin);
+    char strNum[STR_BUF_SZ] = "0";
+    itoa(ret, strNum, DECIMAL);
+    // Send command response
+    Serial.write('A');
+    // Analog pin index
+    Serial.write(ch);
+    // A2D value
+    Serial.write(strNum);
+    // Response terminator
+    Serial.write(";\r\n");
+  } else
+    onError();
+  return ret;
+}
+
+/*
  * Dispatch command to appropriate handler function.
  */
 void dispatchCmd(char cmd) {
@@ -239,6 +276,9 @@ void dispatchCmd(char cmd) {
       break;
     case 'W':
       writeOutputs();
+      break;
+    case 'A':
+      readAnalog();
       break;
     case 'B':
       fireHose();
