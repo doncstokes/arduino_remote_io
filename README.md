@@ -1,7 +1,8 @@
 # arduino_remote_io
+
 Simple Arduino program for using Arduino UNO as remote I/O via RS232.
 
-##USAGE
+## Usage
 
 Note: This program will configure pins 2-7 as pull up inputs and pins 8-13 as outputs with initial values of LOW.  This can be modified if you would like a different distribution of inputs and outputs.
 
@@ -10,3 +11,6 @@ Compile and upload this program to your Arduino UNO.  You may test it using a te
 There are more commands available.  See the comment at the top of the source code for a list of commands.
 
 Once you understand how the commands and responses work, integrate this with your host application by writing and reading the serial port.  You may need a USB to RS232 adapter if you computer does not have a serial port.  If you have a Raspberry Pi, an RS232 port is present.
+
+See the wiki for more information:
+https://github.com/doncstokes/arduino_remote_io/wiki
