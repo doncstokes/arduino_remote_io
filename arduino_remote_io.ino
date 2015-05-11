@@ -14,6 +14,9 @@
  *    Command:  (example: read pin A0) "A0;"
  *    Response: "Api;\r\n" (where p is the pin and i is a decimal integer such that 0 >= i >= 1023)
  *              Reading 1023 is 5.0V on the analog pin.
+ *   PWM:
+ *    Command:  (example: configure output pin D3 for 50% duty cycle) "P380;"
+ *    Response: "P;\r\n"
  *   VERSION:
  *    Command: "V;"
  *    Response: (example) "V1;\r\n"
@@ -66,7 +69,7 @@
 #define STR_BUF_SZ   16
 #define DECIMAL      10
 // API Version
-#define VERSION '2'
+#define VERSION '3'
 
 /*
  * Called by Arduino application framework to initialize the application.
@@ -127,6 +130,10 @@ char readCmd() {
         break;
       
       case 'B':
+        cmdRead = true;
+        break;
+      
+      case 'P':
         cmdRead = true;
         break;
       
@@ -241,6 +248,76 @@ void fireHose() {
 }
 
 /*
+ * Utility for converting an ASCII string of hex digits to a binary unsigned int.
+ * If no error occurs, the result is placed in the variable pointed to by the result parameter.
+ * An error occurs if a non hex digit is encountered in the string.
+ * Parameters:
+ *  str ---- ASCII null-terminated string of hex digits (0-9,a-f,A-F)
+ *  result - Pointer to an unsigned int that is updated with the binary value of the hex digits.
+ * Return:
+ *  0 if no errors, else non-zero indicating error.
+ */
+int strHexToUint(char * str, unsigned int * result) {
+  int error = 0;
+  unsigned int sum = 0;
+  for (sum = 0; !error && *str != '\0'; str++) {
+    sum <<= 4;
+    unsigned int val = 0;
+    char ch = *str;
+    if (ch >= '0' && ch <= '9')
+      val = (unsigned int) (ch - '0');
+    else if (ch >= 'a' && ch <= 'f')
+      val = (unsigned int) (ch - 'a' + 10);
+    else if (ch >= 'A' && ch <= 'F')
+      val = (unsigned int) (ch - 'A' + 10);
+    else
+      error = -1;
+    sum += val;
+  }
+  if (!error && result != 0)
+    *result = sum;
+  return error;
+}
+
+/*
+ * Handler for PWM command.
+ */
+void pwmOutputs() {
+  int err = 0;
+  char ch = 0;
+  do {
+    // Read the output index from the comm channel
+    ch = readChar();
+    if (ch != ';') {
+      int index = 0;
+      if (ch >= '0' && ch < '0' + (char)OUTPUT_COUNT)
+        index = (int)ch - (int)'0';
+      else {
+        err = -1;
+        onError();
+        break;
+      }
+      // Read the PWM value from the comm channel (two chars)
+      char achHex[3];
+      achHex[2] = '\0';
+      achHex[0] = readChar();
+      achHex[1] = readChar();
+      unsigned int val = 0;
+      err = strHexToUint(achHex, &val);
+      if (!err)
+        analogWrite(OUTPUT_FIRST + index, val);
+      else {
+        onError();
+        break;
+      }
+    }
+  } while (ch != ';');
+  if (!err)
+    Serial.write("P;\r\n");
+}
+
+
+/*
  * Handler for for Analog Read command
  */
 int readAnalog() {
@@ -282,6 +359,9 @@ void dispatchCmd(char cmd) {
       break;
     case 'B':
       fireHose();
+      break;
+    case 'P':
+      pwmOutputs();
       break;
     case 'V':
       sendVersion();
